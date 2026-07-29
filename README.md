@@ -3,7 +3,7 @@ just a lil custom new-tab page i built because i got tired of every browser home
 
 not a serious project. mostly an excuse to rice my browser and procrastinate on actual work.
 
-![preview](./preview.png)
+
 <img width="1877" height="957" alt="image" src="https://github.com/user-attachments/assets/d25fb3ea-c8dc-41a9-9190-f341d4c1cb4a" />
 
 
