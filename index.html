@@ -325,7 +325,7 @@
   }
   .pomo-controls{ display:flex; gap:8px; }
   .pomo-controls button{
-    flex:1; border:none; border-radius:9px; padding:9px 0;
+    flex:1; border:none; border-radius:99px; padding:9px 0;
     font-size:13px; font-weight:500; cursor:pointer;
     font-family:'Inter', sans-serif;
   }
@@ -380,17 +380,17 @@
   .contrib-cell.level-0{ background: rgba(255,255,255,0.08); }
 
   .streak-col{
-    display:flex; flex-direction:column; gap:12px;
+    display:flex; flex-direction:column; gap:10px;
     flex-shrink:0; padding-top:2px;
   }
   .streak-box .streak-num{
     font-family:'Space Grotesk', sans-serif; font-weight:600;
-    font-size:28px; line-height:1; color: var(--accent);
+    font-size:24px; line-height:1; color: var(--accent);
     font-variant-numeric: tabular-nums;
   }
   .streak-box .streak-label{
-    font-size:9.5px; color: var(--text-dim); text-transform:uppercase;
-    letter-spacing:0.05em; margin-top:4px; white-space:nowrap;
+    font-size:9px; color: var(--text-dim); text-transform:uppercase;
+    letter-spacing:0.05em; margin-top:3px; white-space:nowrap;
   }
   .streak-box.dim .streak-num{ color: var(--text); opacity:0.8; }
 
@@ -1107,7 +1107,6 @@
     return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
   }
 
-  // Samples pixels from an image/video-sized canvas and returns a vivid hex accent.
   function extractAccentFromCanvasSource(source){
     try{
       const size = 48;
@@ -1121,8 +1120,8 @@
         const rr = data[i], gg = data[i + 1], bb = data[i + 2], aa = data[i + 3];
         if(aa < 128) continue;
         const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb);
-        if(max > 245 && min > 235) continue; // near-white, skip
-        if(max < 18) continue;               // near-black, skip
+        if(max > 245 && min > 235) continue;
+        if(max < 18) continue;
         r += rr; g += gg; b += bb; count++;
       }
       if(!count){
@@ -1137,8 +1136,6 @@
     }catch(e){ return null; }
   }
 
-  // Builds 4 progressively brighter/more-saturated shades of the accent hue,
-  // used for heatmap levels 1-4 (level 0 stays a neutral dim tone).
   function computeAccentShades(hex){
     const rgb = hexToRgb(hex);
     const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -1287,8 +1284,6 @@
   }
 
   function computeStreaks(days){
-    // days: chronologically ordered array of {count}. Today's entry (if present and
-    // zero) is skipped once so an in-progress day doesn't erase yesterday's streak.
     let maxStreak = 0, running = 0;
     days.forEach(d=>{
       if((d.count || 0) > 0){ running++; maxStreak = Math.max(maxStreak, running); }
@@ -1301,8 +1296,7 @@
     return { currentStreak, maxStreak };
   }
 
-  // Renders a "current" and "best" streak as large numbers stacked beside a graph.
-  function renderStreakCol(container, current, best){
+  function renderStreakCol(container, current, best, extraStat = null){
     container.innerHTML = '';
     const mk = (num, label, dim)=>{
       const box = document.createElement('div');
@@ -1312,6 +1306,9 @@
     };
     container.appendChild(mk(current, 'day streak'));
     container.appendChild(mk(best, 'best', true));
+    if(extraStat !== null && extraStat !== undefined){
+      container.appendChild(mk(extraStat.num, extraStat.label, true));
+    }
   }
 
   const HEATMAP_GREEN_SHADES = ['#1a5c34', '#2ea043', '#4ad066', '#7ee787'];
@@ -1333,10 +1330,17 @@
       totalCount = years.length ? data.total[years[years.length - 1]] : 0;
     }
     if(!totalCount) totalCount = days.reduce((sum, d)=> sum + (d.count || 0), 0);
-    githubTotalEl.textContent = totalCount + ' / yr';
+
+    // Filter contributions for the current calendar year
+    const currentYearStr = new Date().getFullYear().toString();
+    const thisYearCount = days
+      .filter(d => d.date && d.date.startsWith(currentYearStr))
+      .reduce((sum, d) => sum + (d.count || 0), 0);
+
+    githubTotalEl.textContent = thisYearCount + ' this yr (' + totalCount + ' total)';
 
     const { currentStreak, maxStreak } = computeStreaks(days);
-    renderStreakCol(githubStreakColEl, currentStreak, maxStreak);
+    renderStreakCol(githubStreakColEl, currentStreak, maxStreak, { num: thisYearCount, label: 'this year' });
 
     const weeks = [];
     let currentWeek = [];
@@ -1367,8 +1371,6 @@
   }
 
   // ---------- LeetCode graph ----------
-  // Uses the leetcode-stats.tashif.codes API: /stats for solved counts,
-  // /heatmap for a GitHub-style submission heatmap.
   const LEETCODE_API_BASE = 'https://leetcode-stats.tashif.codes/';
 
   function fetchWithTimeout(url, ms){
@@ -1627,7 +1629,6 @@
       shortcutsEl.appendChild(tile);
     });
 
-    // add-tile
     const addTile = document.createElement('div');
     addTile.className = 'tile add-tile';
     addTile.innerHTML = `
