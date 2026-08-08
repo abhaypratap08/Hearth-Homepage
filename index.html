@@ -1317,6 +1317,14 @@
     return HEATMAP_GREEN_SHADES[clamp(level, 1, 4) - 1] || null;
   }
 
+  // Scroll a contribution graph container so the most recent days
+  // (the end of the grid) are visible by default, instead of the start.
+  function scrollGraphToEnd(container){
+    requestAnimationFrame(()=>{
+      container.scrollLeft = container.scrollWidth;
+    });
+  }
+
   function renderGithubGraph(data){
     lastGithubData = data;
     const days = Array.isArray(data.contributions) ? data.contributions : [];
@@ -1368,6 +1376,7 @@
       });
       githubGraphEl.appendChild(col);
     });
+    scrollGraphToEnd(githubGraphEl);
   }
 
   // ---------- LeetCode graph ----------
@@ -1482,6 +1491,7 @@
       });
       leetcodeGraphEl.appendChild(col);
     });
+    scrollGraphToEnd(leetcodeGraphEl);
   }
 
   // ---------- Pomodoro widget ----------
