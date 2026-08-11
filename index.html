@@ -96,7 +96,13 @@
 
   /* ---------- Search ---------- */
   #search-form{
+    position:relative;
     width: min(560px, 88vw);
+  }
+  #search-form.detached{
+    position: fixed;
+    z-index: 4;
+    margin: 0;
   }
   #search-box{
     display:flex; align-items:center; gap:12px;
@@ -120,10 +126,19 @@
   #search-input::placeholder{ color: var(--text-dim); }
 
   /* ---------- Shortcuts ---------- */
+  #shortcuts-wrap{
+    position:relative;
+    width: min(680px, 92vw);
+  }
+  #shortcuts-wrap.detached{
+    position: fixed;
+    z-index: 4;
+    margin: 0;
+  }
   #shortcuts{
     display:flex; flex-wrap:wrap; justify-content:center;
     gap: 22px 20px;
-    width: min(680px, 92vw);
+    width: 100%;
   }
   .tile{
     position:relative;
@@ -208,7 +223,9 @@
   .widget-drag-overlay.grabbing{ cursor:grabbing; }
   body.arrange-mode .corner-widget.visible,
   body.arrange-mode #pomodoro-widget.visible,
-  body.arrange-mode #clock-wrap{
+  body.arrange-mode #clock-wrap,
+  body.arrange-mode #search-form,
+  body.arrange-mode #shortcuts-wrap{
     outline: 2px dashed var(--accent);
     outline-offset: 4px;
   }
@@ -530,13 +547,17 @@
   </div>
 
   <form id="search-form">
+    <div class="widget-drag-overlay" title="Drag to move"></div>
     <div id="search-box">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="search-input" type="text" placeholder="Search the web" autocomplete="off">
     </div>
   </form>
 
-  <div id="shortcuts"></div>
+  <div id="shortcuts-wrap">
+    <div class="widget-drag-overlay" title="Drag to move"></div>
+    <div id="shortcuts"></div>
+  </div>
 </div>
 
 <div id="controls">
@@ -621,6 +642,16 @@
     </div>
     <div class="settings-row">
       <div>
+        <div class="settings-label">Search bar</div>
+        <div class="settings-sub">Show the search bar on the homepage</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="searchbar-toggle">
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="settings-row">
+      <div>
         <div class="settings-label">Pomodoro widget</div>
         <div class="settings-sub">Show a focus timer on the homepage</div>
       </div>
@@ -702,6 +733,8 @@
   const SETTINGS_KEY = 'homepage.settings.v1';
 
   const shortcutsEl = document.getElementById('shortcuts');
+  const shortcutsWrap = document.getElementById('shortcuts-wrap');
+  const searchForm = document.getElementById('search-form');
   const modalOverlay = document.getElementById('modal-overlay');
   const modalTitle = document.getElementById('modal-title');
   const inputUrl = document.getElementById('input-url');
@@ -729,12 +762,16 @@
   const leetcodeTotalEl = document.getElementById('leetcode-total');
   const leetcodeStreakColEl = document.getElementById('leetcode-streak-col');
 
+  // All widgets that can be dragged around / detached in arrange mode
+  const movableWidgets = [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap, searchForm, shortcutsWrap];
+
   let shortcuts = [];
   let dragSrcId = null;
   let editingId = null;      // null = adding new, otherwise id of shortcut being edited
   let customIconData = null; // base64 data URL of uploaded custom icon, or null
   let settings = {
     clockFormat: '24',
+    showSearchBar: true,
     showPomodoro: false,
     showGithub: false,
     githubUsername: '',
@@ -927,13 +964,13 @@
     btn.classList.toggle('active', on);
     btn.title = on ? 'Lock widget positions' : 'Move widgets';
     if(!on){
-      [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(clampWidgetToViewport);
+      movableWidgets.forEach(clampWidgetToViewport);
       showHint('Widget positions locked');
     }
   }
   document.getElementById('arrange-btn').addEventListener('click', ()=> setArrangeMode(!arrangeMode));
   window.addEventListener('resize', ()=>{
-    [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(clampWidgetToViewport);
+    movableWidgets.forEach(clampWidgetToViewport);
   });
 
   document.getElementById('bg-file-input').addEventListener('change', (e)=>{
@@ -1055,6 +1092,10 @@
     document.querySelectorAll('#clock-format-toggle button').forEach(btn=>{
       btn.classList.toggle('active', btn.dataset.format === settings.clockFormat);
     });
+  }
+  function applySearchBarVisibility(){
+    searchForm.style.display = settings.showSearchBar ? '' : 'none';
+    document.getElementById('searchbar-toggle').checked = settings.showSearchBar;
   }
   function applyPomodoroVisibility(){
     pomodoroWidget.classList.toggle('visible', settings.showPomodoro);
@@ -1225,6 +1266,7 @@
 
   document.getElementById('settings-btn').addEventListener('click', ()=>{
     applyClockFormatUI();
+    applySearchBarVisibility();
     applyPomodoroVisibility();
     applyGithubSettingsUI();
     applyLeetcodeSettingsUI();
@@ -1244,6 +1286,11 @@
       saveSettings();
       tickClock();
     });
+  });
+  document.getElementById('searchbar-toggle').addEventListener('change', (e)=>{
+    settings.showSearchBar = e.target.checked;
+    applySearchBarVisibility();
+    saveSettings();
   });
   document.getElementById('pomodoro-toggle').addEventListener('change', (e)=>{
     settings.showPomodoro = e.target.checked;
@@ -1758,13 +1805,14 @@
   loadBackground();
   loadSettings();
   applyClockFormatUI();
+  applySearchBarVisibility();
   applyPomodoroVisibility();
   applyAccentForMode();
   loadGithubGraph();
   loadLeetcodeGraph();
 
   loadWidgetPositions();
-  [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(el=>{
+  movableWidgets.forEach(el=>{
     applyStoredPosition(el);
     makeWidgetDraggable(el);
   });
