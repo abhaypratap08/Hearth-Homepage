@@ -61,8 +61,14 @@
 
   /* ---------- Clock ---------- */
   #clock-wrap{
+    position:relative;
     text-align:center;
     user-select:none;
+  }
+  #clock-wrap.detached{
+    position: fixed;
+    z-index: 4;
+    margin: 0;
   }
   #clock{
     font-family:'Space Grotesk', sans-serif;
@@ -201,7 +207,8 @@
   body.arrange-mode .widget-drag-overlay{ display:block; }
   .widget-drag-overlay.grabbing{ cursor:grabbing; }
   body.arrange-mode .corner-widget.visible,
-  body.arrange-mode #pomodoro-widget.visible{
+  body.arrange-mode #pomodoro-widget.visible,
+  body.arrange-mode #clock-wrap{
     outline: 2px dashed var(--accent);
     outline-offset: 4px;
   }
@@ -267,7 +274,6 @@
     -webkit-backdrop-filter: blur(var(--blur));
   }
   #calendar-popover.open{ display:block; }
-  #clock-wrap{ position:relative; }
   #date{ cursor:pointer; }
   .cal-header{
     display:flex; align-items:center; justify-content:space-between;
@@ -506,6 +512,7 @@
 
 <div id="stage">
   <div id="clock-wrap">
+    <div class="widget-drag-overlay" title="Drag to move"></div>
     <div id="clock">00:00<span class="secs">00</span></div>
     <div id="date">—</div>
     <div id="calendar-popover">
@@ -710,6 +717,7 @@
   const settingsOverlay = document.getElementById('settings-overlay');
   const dateEl = document.getElementById('date');
   const calendarPopover = document.getElementById('calendar-popover');
+  const clockWrap = document.getElementById('clock-wrap');
   const pomodoroWidget = document.getElementById('pomodoro-widget');
   const githubWidget = document.getElementById('github-widget');
   const githubGraphEl = document.getElementById('github-graph');
@@ -854,12 +862,14 @@
   function applyStoredPosition(el){
     const pos = widgetPositions[el.id];
     if(!pos) return;
+    el.classList.add('detached');
     el.style.left = pos.left;
     el.style.top = pos.top;
     el.style.right = 'auto';
     el.style.bottom = 'auto';
   }
   function clampWidgetToViewport(el){
+    if(!el.classList.contains('detached')) return;
     if(el.offsetParent === null && getComputedStyle(el).display === 'none') return;
     const rect = el.getBoundingClientRect();
     if(!rect.width || !rect.height) return;
@@ -882,6 +892,7 @@
       if(!arrangeMode) return;
       e.preventDefault();
       const rect = widgetEl.getBoundingClientRect();
+      widgetEl.classList.add('detached');
       widgetEl.style.left = rect.left + 'px';
       widgetEl.style.top = rect.top + 'px';
       widgetEl.style.right = 'auto';
@@ -916,13 +927,13 @@
     btn.classList.toggle('active', on);
     btn.title = on ? 'Lock widget positions' : 'Move widgets';
     if(!on){
-      [pomodoroWidget, githubWidget, leetcodeWidget].forEach(clampWidgetToViewport);
+      [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(clampWidgetToViewport);
       showHint('Widget positions locked');
     }
   }
   document.getElementById('arrange-btn').addEventListener('click', ()=> setArrangeMode(!arrangeMode));
   window.addEventListener('resize', ()=>{
-    [pomodoroWidget, githubWidget, leetcodeWidget].forEach(clampWidgetToViewport);
+    [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(clampWidgetToViewport);
   });
 
   document.getElementById('bg-file-input').addEventListener('change', (e)=>{
@@ -1753,7 +1764,7 @@
   loadLeetcodeGraph();
 
   loadWidgetPositions();
-  [pomodoroWidget, githubWidget, leetcodeWidget].forEach(el=>{
+  [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap].forEach(el=>{
     applyStoredPosition(el);
     makeWidgetDraggable(el);
   });
