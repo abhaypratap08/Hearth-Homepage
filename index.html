@@ -146,6 +146,7 @@
     gap:8px; width: 76px;
     cursor:pointer;
     animation: fadeUp 0.35s ease both;
+    touch-action: none;
   }
   @keyframes fadeUp{
     from{ opacity:0; transform: translateY(8px); }
@@ -187,7 +188,18 @@
   .tile .remove-btn{ right:8px; background: var(--danger); }
   .tile .edit-btn{ left:8px; background: #4d84ff; font-size:12px; }
   .tile:hover .remove-btn, .tile:hover .edit-btn{ display:flex; }
-  .tile.dragging{ opacity:0.4; }
+  .tile.dragging{
+    opacity:0.85;
+    z-index:30;
+    cursor:grabbing;
+    transition: none;
+  }
+  .tile.dragging .icon-box{
+    background: var(--glass-strong);
+    border-color: rgba(255,255,255,0.4);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.35);
+  }
+  .tile.drag-disabled{ animation:none; }
 
   .tile.add-tile .icon-box{
     border-style:dashed;
@@ -766,7 +778,6 @@
   const movableWidgets = [pomodoroWidget, githubWidget, leetcodeWidget, clockWrap, searchForm, shortcutsWrap];
 
   let shortcuts = [];
-  let dragSrcId = null;
   let editingId = null;      // null = adding new, otherwise id of shortcut being edited
   let customIconData = null; // base64 data URL of uploaded custom icon, or null
   let settings = {
@@ -1623,13 +1634,81 @@
     return 'https://www.google.com/s2/favicons?sz=128&domain=' + encodeURIComponent(hostname);
   }
 
+  // Pointer-based drag-to-reorder for shortcut tiles.
+  // Works with mouse, touch, and pen alike (unlike native HTML5 DnD,
+  // which is unreliable on touchscreens). A tile only "reorders" once
+  // the pointer has moved past a small threshold, so a quick tap still
+  // navigates to the shortcut as normal.
+  function attachTileReorder(tile, sc){
+    let pointerId = null;
+    let dragging = false;
+    let startX = 0, startY = 0;
+    const DRAG_THRESHOLD = 6;
+
+    tile.addEventListener('pointerdown', (e)=>{
+      if(e.target.closest('.remove-btn') || e.target.closest('.edit-btn')) return;
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      pointerId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragging = false;
+      tile.setPointerCapture(pointerId);
+    });
+
+    tile.addEventListener('pointermove', (e)=>{
+      if(pointerId === null || e.pointerId !== pointerId) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      if(!dragging){
+        if(Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        dragging = true;
+        tile.classList.add('dragging');
+        tile.style.position = 'relative';
+        tile.style.pointerEvents = 'none';
+      }
+
+      tile.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const overTile = under ? under.closest('.tile') : null;
+      if(overTile && overTile !== tile && !overTile.classList.contains('add-tile') && overTile.parentElement === shortcutsEl){
+        const overRect = overTile.getBoundingClientRect();
+        const insertBefore = e.clientX < overRect.left + overRect.width / 2;
+        shortcutsEl.insertBefore(tile, insertBefore ? overTile : overTile.nextSibling);
+      }
+    });
+
+    function endDrag(e){
+      if(pointerId === null || e.pointerId !== pointerId) return;
+      try{ tile.releasePointerCapture(pointerId); }catch(err){}
+      pointerId = null;
+      tile.style.pointerEvents = '';
+      tile.style.transform = '';
+      tile.style.position = '';
+      tile.classList.remove('dragging');
+
+      if(dragging){
+        dragging = false;
+        // Re-derive shortcuts order from the current DOM order of tiles.
+        const ids = Array.from(shortcutsEl.querySelectorAll('.tile:not(.add-tile)')).map(t=> t.dataset.id);
+        shortcuts.sort((a, b)=> ids.indexOf(a.id) - ids.indexOf(b.id));
+        saveShortcuts();
+        // Suppress the click that a pointerup normally triggers after a drag.
+        tile.dataset.justDragged = '1';
+        setTimeout(()=>{ tile.dataset.justDragged = ''; }, 0);
+      }
+    }
+    tile.addEventListener('pointerup', endDrag);
+    tile.addEventListener('pointercancel', endDrag);
+  }
+
   function renderShortcuts(){
     shortcutsEl.innerHTML = '';
     shortcuts.forEach(sc => {
       const hostname = getHostname(sc.url);
       const tile = document.createElement('div');
       tile.className = 'tile';
-      tile.draggable = true;
       tile.dataset.id = sc.id;
 
       const iconBox = document.createElement('div');
@@ -1637,6 +1716,7 @@
       const img = document.createElement('img');
       img.src = sc.icon || faviconUrl(hostname);
       img.alt = '';
+      img.draggable = false;
       img.onerror = function(){
         iconBox.innerHTML = '';
         const letter = document.createElement('div');
@@ -1675,24 +1755,12 @@
       tile.appendChild(iconBox);
       tile.appendChild(label);
 
-      tile.addEventListener('click', ()=>{ window.location.href = sc.url; });
+      tile.addEventListener('click', ()=>{
+        if(tile.dataset.justDragged === '1') return;
+        window.location.href = sc.url;
+      });
 
-      tile.addEventListener('dragstart', ()=>{
-        dragSrcId = sc.id;
-        tile.classList.add('dragging');
-      });
-      tile.addEventListener('dragend', ()=>{ tile.classList.remove('dragging'); });
-      tile.addEventListener('dragover', (e)=> e.preventDefault());
-      tile.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        if(!dragSrcId || dragSrcId === sc.id) return;
-        const fromIdx = shortcuts.findIndex(s => s.id === dragSrcId);
-        const toIdx = shortcuts.findIndex(s => s.id === sc.id);
-        const [moved] = shortcuts.splice(fromIdx, 1);
-        shortcuts.splice(toIdx, 0, moved);
-        saveShortcuts();
-        renderShortcuts();
-      });
+      attachTileReorder(tile, sc);
 
       shortcutsEl.appendChild(tile);
     });
