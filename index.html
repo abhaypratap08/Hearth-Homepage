@@ -902,21 +902,36 @@
       widgetPositions = raw ? JSON.parse(raw) : {};
     }catch(e){ widgetPositions = {}; }
   }
-  function saveWidgetPosition(id, left, top){
-    widgetPositions[id] = { left, top };
+
+  // Positions are stored as FRACTIONS of the viewport (0–1), not raw
+  // pixels. That way a widget dragged to "30% across, 10% down" stays
+  // at 30%/10% no matter how the window is resized afterwards, instead
+  // of drifting or getting permanently clamped to a smaller viewport.
+  function saveWidgetPosition(id, leftPx, topPx){
+    const leftFrac = parseFloat(leftPx) / window.innerWidth;
+    const topFrac = parseFloat(topPx) / window.innerHeight;
+    widgetPositions[id] = { leftFrac, topFrac };
     try{ localStorage.setItem(WIDGET_POS_KEY, JSON.stringify(widgetPositions)); }
     catch(e){ showHint('Could not save widget position'); }
   }
+
   function applyStoredPosition(el){
     const pos = widgetPositions[el.id];
     if(!pos) return;
     el.classList.add('detached');
-    el.style.left = pos.left;
-    el.style.top = pos.top;
+    el.style.left = (pos.leftFrac * window.innerWidth) + 'px';
+    el.style.top = (pos.topFrac * window.innerHeight) + 'px';
     el.style.right = 'auto';
     el.style.bottom = 'auto';
   }
-  function clampWidgetToViewport(el){
+
+  // Keeps a detached widget from spilling off-screen. By default this
+  // is purely visual and does NOT overwrite the saved fraction — so
+  // shrinking the window nudges the widget inward temporarily, and
+  // growing it back out restores the original saved position. Pass
+  // persist=true only for explicit user actions (finishing a drag,
+  // locking arrange mode) where the new spot really should be saved.
+  function clampWidgetToViewport(el, persist){
     if(!el.classList.contains('detached')) return;
     if(el.offsetParent === null && getComputedStyle(el).display === 'none') return;
     const rect = el.getBoundingClientRect();
@@ -930,9 +945,10 @@
       el.style.top = top + 'px';
       el.style.right = 'auto';
       el.style.bottom = 'auto';
-      saveWidgetPosition(el.id, left + 'px', top + 'px');
+      if(persist) saveWidgetPosition(el.id, left + 'px', top + 'px');
     }
   }
+
   function makeWidgetDraggable(widgetEl){
     const overlay = widgetEl.querySelector('.widget-drag-overlay');
     if(!overlay) return;
@@ -962,6 +978,7 @@
         overlay.removeEventListener('pointermove', onMove);
         overlay.removeEventListener('pointerup', onUp);
         overlay.classList.remove('grabbing');
+        // A real user-initiated move — safe to persist as the new fraction.
         saveWidgetPosition(widgetEl.id, widgetEl.style.left, widgetEl.style.top);
       }
       overlay.addEventListener('pointermove', onMove);
@@ -975,13 +992,22 @@
     btn.classList.toggle('active', on);
     btn.title = on ? 'Lock widget positions' : 'Move widgets';
     if(!on){
-      movableWidgets.forEach(clampWidgetToViewport);
+      // Locking is an explicit action, so it's fine to persist any
+      // edge-clamping that happens at this moment.
+      movableWidgets.forEach(el => clampWidgetToViewport(el, true));
       showHint('Widget positions locked');
     }
   }
   document.getElementById('arrange-btn').addEventListener('click', ()=> setArrangeMode(!arrangeMode));
   window.addEventListener('resize', ()=>{
-    movableWidgets.forEach(clampWidgetToViewport);
+    // Re-derive each widget's pixel position from its saved fraction
+    // first (so growing the window back out snaps it back to where
+    // the user actually put it), then apply a non-persisting clamp
+    // purely so nothing sits off-screen while the window is small.
+    movableWidgets.forEach(el=>{
+      if(el.classList.contains('detached')) applyStoredPosition(el);
+    });
+    movableWidgets.forEach(el => clampWidgetToViewport(el, false));
   });
 
   document.getElementById('bg-file-input').addEventListener('change', (e)=>{
