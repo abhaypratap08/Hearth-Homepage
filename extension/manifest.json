@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Hearth",
+  "description": "A minimal, private, customizable new tab page. No accounts, no tracking, no bloat.",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://github-contributions-api.jogruber.de/*",
+    "https://leetcode-stats.tashif.codes/*",
+    "https://www.google.com/s2/favicons*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google.com https://*.google.com; media-src 'self' blob: data:; connect-src https://github-contributions-api.jogruber.de https://leetcode-stats.tashif.codes https://www.google.com"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hearth@extension",
+      "strict_min_version": "109.0"
+    }
+  }
+}

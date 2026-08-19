@@ -1,0 +1,49 @@
+name: Auto Release & Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Extension & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed so we can diff against the previous tag for changelog
+
+      - name: Build packages
+        run: bash scripts/build.sh
+
+      - name: Generate changelog
+        id: tag
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            git log "$PREV_TAG"..HEAD --pretty=format:"- %s" --no-merges > CHANGELOG.md
+          else
+            git log --pretty=format:"- %s" --no-merges > CHANGELOG.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Hearth Homepage ${{ steps.tag.outputs.version }}"
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          files: |
+            store/chrome/hearth-chrome.zip
+            store/firefox/hearth-firefox.zip
+            store/edge/hearth-edge.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate extension structure
+        run: bash scripts/validate.sh
+
+      - name: Check for secrets
+        run: |
+          echo "Checking for committed secrets..."
+          if grep -rn "api_key\|secret\|token\|password" extension/js/ --include="*.js" | grep -v "LEETCODE_API_BASE\|github-contributions-api"; then
+            echo "WARNING: Potential secrets found"
+            exit 1
+          fi
+          echo "No secrets found"
+
+      - name: Build packages
+        run: bash scripts/build.sh
+
+      - name: Upload Chrome artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hearth-chrome
+          path: store/chrome/hearth-chrome.zip
+
+      - name: Upload Firefox artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hearth-firefox
+          path: store/firefox/hearth-firefox.zip
+
+      - name: Upload Edge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hearth-edge
+          path: store/edge/hearth-edge.zip
