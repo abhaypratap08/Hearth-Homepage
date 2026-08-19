@@ -1,16 +1,22 @@
 #!/bin/bash
 set -e
 
-EXTENSION_DIR="$(cd "$(dirname "$0")/../extension" && pwd)"
-STORE_DIR="$(cd "$(dirname "$0")/../store" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+EXTENSION_DIR="$ROOT_DIR/extension"
+STORE_DIR="$ROOT_DIR/store"
 
 echo "=== Building Hearth extension packages ==="
-mkdir -p "$STORE_DIR"/{chrome,firefox,edge}
+
+mkdir -p "$STORE_DIR/chrome" "$STORE_DIR/firefox" "$STORE_DIR/edge"
+
 rm -f "$STORE_DIR/chrome/hearth-chrome.zip"
 
 cd "$EXTENSION_DIR"
 zip -r "$STORE_DIR/chrome/hearth-chrome.zip" . \
   -x "*.git*" "store/*" "docs/*" "*.md"
+cd "$ROOT_DIR"
+
 echo "  -> store/chrome/hearth-chrome.zip"
 
 for browser in firefox edge; do
@@ -18,7 +24,6 @@ for browser in firefox edge; do
   echo "  -> store/$browser/hearth-$browser.zip"
 done
 
-echo ""
 echo "=== Build complete ==="
 echo "Chrome/Brave/Opera: store/chrome/hearth-chrome.zip"
 echo "Firefox:            store/firefox/hearth-firefox.zip"
